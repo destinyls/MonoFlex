@@ -189,7 +189,7 @@ def inference(
                                         metric=metric)
 
         logger.info('metric = {}'.format(metric))
-        # logger.info('\n' + result)
+        logger.info('\n' + result)
         iteration = int(predict_folder.split('/')[-2].split('_')[1])
         mAP_3d_moderate = ret_dict['Car_3d_0.70/moderate']
         result_path = os.path.join(predict_folder, '../../../R11')
