@@ -120,7 +120,7 @@ class Loss_Computation():
 
 	def prepare_predictions(self, targets_variables, predictions):
 		pred_regression = predictions['reg']
-		batch, channel, feat_h, feat_w = pred_regression.shape
+		batch, channel, _ = pred_regression.shape
 
 		# 1. get the representative points
 		targets_bbox_points = targets_variables["target_centers"] # representative points
@@ -162,7 +162,8 @@ class Loss_Computation():
 		obj_weights = targets_variables["reg_weight"].view(-1)[flatten_reg_mask_gt]
 
 		# 2. extract corresponding predictions
-		pred_regression_pois_3D = select_point_of_interest(batch, targets_bbox_points, pred_regression).view(-1, channel)[flatten_reg_mask_gt]
+		# pred_regression_pois_3D = select_point_of_interest(batch, targets_bbox_points, pred_regression).view(-1, channel)[flatten_reg_mask_gt]
+		pred_regression_pois_3D = pred_regression.permute(0, 2, 1).contiguous().view(-1, channel)[flatten_reg_mask_gt]
 		
 		pred_regression_2D = F.relu(pred_regression_pois_3D[mask_regression_2D, self.key2channel('2d_dim')])
 		pred_offset_3D = pred_regression_pois_3D[:, self.key2channel('3d_offset')]

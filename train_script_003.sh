@@ -1,2 +1,1 @@
-CUDA_VISIBLE_DEVICES=3 python tools/plain_train_net.py --batch_size 8 --backbone RESNET-18 --output output/RESNET18_Baseline_003nd
-python tools/evaluate_script.py --pred_label_folder output/RESNET18_Baseline_003nd/kitti_train
+CUDA_VISIBLE_DEVICES=6 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --output output/DLA-34_LITE_FPN_002nd

@@ -76,6 +76,9 @@ class PostProcessor(nn.Module):
 
 	def forward(self, predictions, targets, features=None, test=False, refine_module=None):
 		pred_heatmap, pred_regression = predictions['cls'], predictions['reg']
+		scores, indexs, clses = predictions['scores'], predictions['indexs'], predictions['clses']
+		ys, xs =predictions['ys'], predictions['xs']
+
 		batch = pred_heatmap.shape[0]
 
 		target_varibales = self.prepare_targets(targets, test=test)
@@ -87,16 +90,11 @@ class PostProcessor(nn.Module):
 
 		# evaluate the accuracy of predicted depths
 		depth_errors = self.evaluate_3D_depths(target_varibales, pred_regression) if self.eval_depth else None
-
-		# max-pooling as nms for heat-map
-		heatmap = nms_hm(pred_heatmap)
 		visualize_preds = {'heat_map': pred_heatmap.clone()}
 
-		# select top-k of the predicted heatmap
-		scores, indexs, clses, ys, xs = select_topk(heatmap, K=self.max_detection)
-
 		pred_bbox_points = torch.cat([xs.view(-1, 1), ys.view(-1, 1)], dim=1)
-		pred_regression_pois = select_point_of_interest(batch, indexs, pred_regression).view(-1, pred_regression.shape[1])
+		pred_regression_pois = pred_regression.permute(0, 2, 1).contiguous()       # [N, K, 50]
+		pred_regression_pois = pred_regression_pois.view(-1, pred_regression.shape[-1])
 
 		# thresholding with score
 		scores = scores.view(-1)
