@@ -38,7 +38,7 @@ def reduce_loss_dict(loss_dict):
 
 	return reduced_losses
 
-def do_eval(cfg, model, data_loaders_val, iteration, depth_method):
+def do_eval(cfg, model, data_loaders_val, iteration, depth_method, metrics=['R40']):
 	eval_types = ("detection",)
 	dataset_name = cfg.DATASETS.TEST[0]
 
@@ -56,6 +56,7 @@ def do_eval(cfg, model, data_loaders_val, iteration, depth_method):
 		eval_types=eval_types,
 		device=cfg.MODEL.DEVICE,
 		output_folder=output_folder,
+		metrics=metrics
 	)
 	comm.synchronize()
 
@@ -182,7 +183,7 @@ def do_train(
 				else:
 					logger.info('iteration = {}, evaluate model on validation set with depth {}'.format(iteration, depth_method))
 				
-				result_dict, dis_ious = do_eval(cfg, model, data_loaders_val, iteration, depth_method)
+				result_dict, dis_ious = do_eval(cfg, model, data_loaders_val, iteration, depth_method, metrics=cfg.TEST.METRIC)
 				
 				if comm.get_rank() == 0:
 					# only record more accurate R40 results

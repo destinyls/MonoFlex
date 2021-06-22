@@ -13,8 +13,11 @@ from model.layers.utils import sigmoid_hm
 from model.make_layers import group_norm, _fill_fc_weights
 from model.layers.utils import select_point_of_interest
 from model.backbone.DCNv2.dcn_v2 import DCNv2
+from model.head.detector_loss import make_loss_evaluator
 
 from inplace_abn import InPlaceABN
+
+
 
 @registry.PREDICTOR.register("Base_Predictor")
 class _predictor(nn.Module):
@@ -39,6 +42,8 @@ class _predictor(nn.Module):
         self.use_inplace_abn = cfg.MODEL.INPLACE_ABN
         self.bn_momentum = cfg.MODEL.HEAD.BN_MOMENTUM
         self.abn_activision = 'leaky_relu'
+
+        self.loss_evaluator = make_loss_evaluator(cfg)
 
         ###########################################
         ###############  Cls Heads ################
@@ -120,16 +125,16 @@ class _predictor(nn.Module):
             )
 
     def forward(self, features, targets):
-        b, c, h, w = features.shape
-        
+        up_level16, up_level8, up_level4 = features[0], features[1], features[2]
+        b, c, h, w = up_level4.shape
         # output classification
-        feature_cls = self.class_head[:-1](features)
+        feature_cls = self.class_head[:-1](up_level4)
         output_cls = self.class_head[-1](feature_cls)
 
         output_regs = []
         # output regression
         for i, reg_feature_head in enumerate(self.reg_features):
-            reg_feature = reg_feature_head(features)
+            reg_feature = reg_feature_head(up_level4)
 
             for j, reg_output_head in enumerate(self.reg_heads[i]):
                 output_reg = reg_output_head(reg_feature)
