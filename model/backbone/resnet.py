@@ -8,6 +8,9 @@ import torch
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 
+import torch.nn.functional as F
+
+
 BN_MOMENTUM = 0.1
 
 model_urls = {
@@ -100,8 +103,8 @@ class ResNet(nn.Module):
 
     def __init__(self, block, layers, **kwargs):
         self.inplanes = 64
-        self.deconv_with_bias = False
         self.out_channels = 64
+        self.deconv_with_bias = False
 
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
@@ -115,11 +118,9 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
 
         # used for deconv layers
-        self.deconv_layers = self._make_deconv_layer(
-            3,
-            [256, 128, 64],
-            [4, 4, 4],
-        )
+        self.deconv_layers_1 = self._make_deconv_layer(256, 4)
+        self.deconv_layers_2 = self._make_deconv_layer(128, 4)
+        self.deconv_layers_3 = self._make_deconv_layer(64, 4)
 
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
@@ -138,7 +139,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _get_deconv_cfg(self, deconv_kernel, index):
+    def _get_deconv_cfg(self, deconv_kernel):
         if deconv_kernel == 4:
             padding = 1
             output_padding = 0
@@ -151,29 +152,22 @@ class ResNet(nn.Module):
 
         return deconv_kernel, padding, output_padding
 
-    def _make_deconv_layer(self, num_layers, num_filters, num_kernels):
-        assert num_layers == len(num_filters), \
-            'ERROR: num_deconv_layers is different len(num_deconv_filters)'
-        assert num_layers == len(num_kernels), \
-            'ERROR: num_deconv_layers is different len(num_deconv_filters)'
-
+    def _make_deconv_layer(self, num_filters, num_kernels):
         layers = []
-        for i in range(num_layers):
-            kernel, padding, output_padding = \
-                self._get_deconv_cfg(num_kernels[i], i)
-            planes = num_filters[i]
-            layers.append(
-                nn.ConvTranspose2d(
-                    in_channels=self.inplanes,
-                    out_channels=planes,
-                    kernel_size=kernel,
-                    stride=2,
-                    padding=padding,
-                    output_padding=output_padding,
-                    bias=self.deconv_with_bias))
-            layers.append(nn.BatchNorm2d(planes, momentum=BN_MOMENTUM))
-            layers.append(nn.ReLU(inplace=True))
-            self.inplanes = planes
+        kernel, padding, output_padding = self._get_deconv_cfg(num_kernels)
+        planes = num_filters
+        layers.append(
+            nn.ConvTranspose2d(
+                in_channels=self.inplanes,
+                out_channels=planes,
+                kernel_size=kernel,
+                stride=2,
+                padding=padding,
+                output_padding=output_padding,
+                bias=self.deconv_with_bias))
+        layers.append(nn.BatchNorm2d(planes, momentum=BN_MOMENTUM))
+        layers.append(nn.ReLU(inplace=True))
+        self.inplanes = planes
 
         return nn.Sequential(*layers)
 
@@ -188,25 +182,38 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.deconv_layers(x)
+        up_level1 = self.deconv_layers_1(x)
+        up_level2 = self.deconv_layers_2(up_level1)
+        up_level3 = self.deconv_layers_3(up_level2)
 
-        return x
+        return [up_level1, up_level2, up_level3]
+
+    def init_conv(self, layer):
+        nn.init.normal_(layer.weight, std=0.001)
+        if layer.bias is not None:
+            nn.init.constant_(layer.bias, 0)
+    
+    def init_deconv(self, layer):
+        for _, m in layer.named_modules():
+            if isinstance(m, nn.ConvTranspose2d):
+                # print('=> init {}.weight as normal(0, 0.001)'.format(name))
+                # print('=> init {}.bias as 0'.format(name))
+                nn.init.normal_(m.weight, std=0.001)
+                if self.deconv_with_bias:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                # print('=> init {}.weight as 1'.format(name))
+                # print('=> init {}.bias as 0'.format(name))
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
 
     def init_weights(self, num_layers, pretrained=True):
         if pretrained:
             # print('=> init resnet deconv weights from normal distribution')
-            for _, m in self.deconv_layers.named_modules():
-                if isinstance(m, nn.ConvTranspose2d):
-                    # print('=> init {}.weight as normal(0, 0.001)'.format(name))
-                    # print('=> init {}.bias as 0'.format(name))
-                    nn.init.normal_(m.weight, std=0.001)
-                    if self.deconv_with_bias:
-                        nn.init.constant_(m.bias, 0)
-                elif isinstance(m, nn.BatchNorm2d):
-                    # print('=> init {}.weight as 1'.format(name))
-                    # print('=> init {}.bias as 0'.format(name))
-                    nn.init.constant_(m.weight, 1)
-                    nn.init.constant_(m.bias, 0)
+            self.init_deconv(self.deconv_layers_1)
+            self.init_deconv(self.deconv_layers_2)
+            self.init_deconv(self.deconv_layers_3)
 
             #pretrained_state_dict = torch.load(pretrained)
             url = model_urls['resnet{}'.format(num_layers)]

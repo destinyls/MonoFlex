@@ -189,8 +189,14 @@ def inference(
                                         metric=metric)
 
         logger.info('metric = {}'.format(metric))
-        logger.info('\n' + result)
-
+        # logger.info('\n' + result)
+        iteration = int(predict_folder.split('/')[-2].split('_')[1])
+        mAP_3d_moderate = ret_dict['Car_3d_0.70/moderate']
+        result_path = os.path.join(predict_folder, '../../../R11')
+        if not os.path.exists(result_path):
+            os.makedirs(result_path)
+        with open(os.path.join(result_path, 'epoch_result_{:07d}_{}.txt'.format(iteration, round(mAP_3d_moderate, 4))), "w") as f:
+                f.write(result)
         ret_dicts.append(ret_dict)
 
     return ret_dicts, dis_ious
