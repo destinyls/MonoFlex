@@ -162,7 +162,6 @@ class Loss_Computation():
 		obj_weights = targets_variables["reg_weight"].view(-1)[flatten_reg_mask_gt]
 
 		# 2. extract corresponding predictions
-		# pred_regression_pois_3D = select_point_of_interest(batch, targets_bbox_points, pred_regression).view(-1, channel)[flatten_reg_mask_gt]
 		pred_regression_pois_3D = pred_regression.permute(0, 2, 1).contiguous().view(-1, channel)[flatten_reg_mask_gt]
 		
 		pred_regression_2D = F.relu(pred_regression_pois_3D[mask_regression_2D, self.key2channel('2d_dim')])
@@ -259,9 +258,8 @@ class Loss_Computation():
 		return targets, preds, reg_nums, weights
 
 	def __call__(self, predictions, targets):
-		targets_heatmap, targets_variables = self.prepare_targets(targets)
-
 		pred_heatmap = predictions['cls']
+		targets_heatmap, targets_variables = predictions['targets_heatmap'], predictions['targets_variables']
 		pred_targets, preds, reg_nums, weights = self.prepare_predictions(targets_variables, predictions)
 
 		# heatmap loss

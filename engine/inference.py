@@ -180,7 +180,10 @@ def inference(
         return None, None
 
     logger.info('Finishing generating predictions, start evaluating ...')
+
+    print("***: ", comm.get_world_size())
     ret_dicts = []
+
     for metric in metrics:
         result, ret_dict = evaluate_python(label_path=dataset.label_dir, 
                                         result_path=predict_folder,

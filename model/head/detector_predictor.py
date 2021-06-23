@@ -190,13 +190,12 @@ class _predictor(nn.Module):
             reg_feature_pois = torch.cat((reg_feature_pois, up_level8_pois, up_level16_pois), dim=-1)
             reg_feature_pois = reg_feature_pois.permute(0, 2, 1).contiguous().unsqueeze(-1)  # [N, 640, K, 1]
             for j, reg_output_head in enumerate(self.reg_heads[i]):
-                output_reg = reg_output_head(reg_feature_pois)   
-                output_reg = output_reg.squeeze(-1)                                         # [N, C, K]
+                output_reg = reg_output_head(reg_feature_pois).squeeze(-1)                   # [N, C, K]
                 output_regs.append(output_reg)
 
         output_regs = torch.cat(output_regs, dim=1)   # [N, 50, 40]         
         if self.training:
-            return {'cls': output_cls, 'reg': output_regs}
+            return {'cls': output_cls, 'reg': output_regs, 'targets_heatmap': targets_heatmap, 'targets_variables': targets_variables}
         if not self.training:
             return {'cls': output_cls, 'reg': output_regs, 'scores': scores, 'indexs': indexs, 'clses': clses, 'ys': ys, 'xs': xs}
 
