@@ -23,8 +23,8 @@ class _predictor(nn.Module):
         # ("Car", "Cyclist", "Pedestrian")
         classes = len(cfg.DATASETS.DETECT_CLASSES)
         
-        self.regression_head_cfg = cfg.MODEL.HEAD.REGRESSION_HEADS
-        self.regression_channel_cfg = cfg.MODEL.HEAD.REGRESSION_CHANNELS
+        self.regression_head_cfg = cfg.MODEL.HEAD.REGRESSION_MERGE_HEADS
+        self.regression_channel_cfg = cfg.MODEL.HEAD.REGRESSION_MERGE_CHANNELS
         self.output_width = cfg.INPUT.WIDTH_TRAIN // cfg.MODEL.BACKBONE.DOWN_RATIO
         self.output_height = cfg.INPUT.HEIGHT_TRAIN // cfg.MODEL.BACKBONE.DOWN_RATIO
         

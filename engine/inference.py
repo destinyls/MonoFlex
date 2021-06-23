@@ -73,7 +73,7 @@ def inference_all_depths(
         eval_score_iou=False,
         metrics=['R40', 'R11'],
 ):
-    metrics = ['R40']
+    metrics = ['R11']
     inference_timer = None
     device = torch.device(device)
     logger = logging.getLogger("monoflex.inference")
@@ -138,7 +138,7 @@ def inference(
         eval_types=("detections",),
         device="cuda",
         output_folder=None,
-        metrics=['R40'],
+        metrics=['R11'],
         vis=False,
         eval_score_iou=False,
 ):
@@ -182,6 +182,7 @@ def inference(
     logger.info('Finishing generating predictions, start evaluating ...')
     ret_dicts = []
     for metric in metrics:
+        print(metric)
         result, ret_dict = evaluate_python(label_path=dataset.label_dir, 
                                         result_path=predict_folder,
                                         label_split_file=dataset.imageset_txt,
@@ -190,6 +191,14 @@ def inference(
 
         logger.info('metric = {}'.format(metric))
         logger.info('\n' + result)
+
+        iteration = int(predict_folder.split('/')[-2].split('_')[1])
+        mAP_3d_moderate = ret_dict['Car_3d_0.70/moderate']
+        result_path = os.path.join(predict_folder, '../../../R11')
+        if not os.path.exists(result_path):
+            os.makedirs(result_path)
+        with open(os.path.join(result_path, 'epoch_result_{:07d}_{}.txt'.format(iteration, round(mAP_3d_moderate, 4))), "w") as f:
+                f.write(result)
 
         ret_dicts.append(ret_dict)
 

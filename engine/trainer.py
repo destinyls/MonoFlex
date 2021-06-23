@@ -47,7 +47,10 @@ def do_eval(cfg, model, data_loaders_val, iteration, depth_method):
 		os.makedirs(output_folder, exist_ok=True)
 
 	# modify depth method
-	model.heads.post_processor.output_depth = depth_method
+	if get_world_size() == 0:
+		model.heads.post_processor.output_depth = depth_method
+	else:
+		model.module.heads.post_processor.output_depth = depth_method
 
 	evaluate_metric, dis_ious = inference(
 		model,
@@ -98,12 +101,12 @@ def do_train(
 	if len(eval_depth_methods) == 0:
 		eval_depth_methods.append(default_depth_method)
 
-	if comm.get_local_rank() == 0:
-		writer = SummaryWriter(os.path.join(cfg.OUTPUT_DIR, 'writer/{}/'.format(cfg.START_TIME)))
-		best_mAP = np.zeros(len(eval_depth_methods))
-		best_iteration = 0
-		eval_iteration = 0
-		record_metrics = ['Car_bev_', 'Car_3d_']
+	# if comm.get_local_rank() == 0:
+	writer = SummaryWriter(os.path.join(cfg.OUTPUT_DIR, 'writer/{}/'.format(cfg.START_TIME)))
+	best_mAP = np.zeros(len(eval_depth_methods))
+	best_iteration = 0
+	eval_iteration = 0
+	record_metrics = ['Car_bev_', 'Car_3d_']
 	
 	for data, iteration in zip(data_loader, range(start_iter, max_iter)):
 		data_time = time.time() - end
@@ -214,7 +217,10 @@ def do_train(
 											format(iteration, eval_mAP, depth_method))
 
 			# reset default depth method
-			model.heads.post_processor.output_depth = default_depth_method
+			if get_world_size() == 0:
+    				model.heads.post_processor.output_depth = default_depth_method
+			else:
+    				model.module.heads.post_processor.output_depth = default_depth_method
 			
 			eval_iteration += 1
 			model.train()

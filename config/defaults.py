@@ -154,6 +154,8 @@ _C.MODEL.HEAD.LOSS_BETA = 4
 # 2d offset, 2d dimension
 _C.MODEL.HEAD.NUM_CHANNEL = 256
 _C.MODEL.HEAD.USE_NORMALIZATION = "BN"
+_C.MODEL.HEAD.REGRESSION_MERGE_HEADS = [['2d_dim'], ['3d_offset'], ['3d_dim'], ['ori_cls', 'ori_offset'], ['depth']]
+_C.MODEL.HEAD.REGRESSION_MERGE_CHANNELS = [[4, ], [2, ], [3, ], [4, 2], [1, ]]
 _C.MODEL.HEAD.REGRESSION_HEADS = [['2d_dim'], ['3d_offset'], ['3d_dim'], ['ori_cls', 'ori_offset'], ['depth']]
 _C.MODEL.HEAD.REGRESSION_CHANNELS = [[4, ], [2, ], [3, ], [4, 2], [1, ]]
 
