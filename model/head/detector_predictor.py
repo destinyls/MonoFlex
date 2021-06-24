@@ -86,7 +86,8 @@ class _predictor(nn.Module):
 
                 if key.find('uncertainty') >= 0 and cfg.MODEL.HEAD.UNCERTAINTY_INIT:
                     # default gain = 1
-                    torch.nn.init.xavier_normal_(output_head.weight, gain=1e-4)
+                    print("omit xavier initialization ...")
+                    # torch.nn.init.xavier_normal_(output_head.weight, gain=1e-4)
                 
                 # since the edge fusion is applied to the offset branch, we should save the index of this branch
                 if key == '3d_offset': self.offset_index = [idx, key_index]

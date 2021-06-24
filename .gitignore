@@ -2,6 +2,7 @@
 .pyc
 .out
 .pyc
+env.sh
 nohup.out
 model/backbone/DCNv2/
 monoflex.egg-info/

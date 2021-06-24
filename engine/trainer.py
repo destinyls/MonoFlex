@@ -47,7 +47,7 @@ def do_eval(cfg, model, data_loaders_val, iteration, depth_method):
 		os.makedirs(output_folder, exist_ok=True)
 
 	# modify depth method
-	if get_world_size() == 0:
+	if get_world_size() == 1:
 		model.heads.post_processor.output_depth = depth_method
 	else:
 		model.module.heads.post_processor.output_depth = depth_method
@@ -90,6 +90,8 @@ def do_train(
 		warmup_iters = cfg.SOLVER.WARMUP_STEPS
 	else:
 		warmup_iters = -1
+
+	print("***************: ", get_world_size())
 
 	model.train()
 	start_training_time = time.time()
@@ -217,7 +219,7 @@ def do_train(
 											format(iteration, eval_mAP, depth_method))
 
 			# reset default depth method
-			if get_world_size() == 0:
+			if get_world_size() == 1:
     				model.heads.post_processor.output_depth = default_depth_method
 			else:
     				model.module.heads.post_processor.output_depth = default_depth_method
