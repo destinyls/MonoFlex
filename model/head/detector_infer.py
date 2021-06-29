@@ -93,10 +93,8 @@ class PostProcessor(nn.Module):
 		visualize_preds = {'heat_map': pred_heatmap.clone()}
 
 		# select top-k of the predicted heatmap
-		scores, indexs, clses, ys, xs = select_topk(heatmap, K=self.max_detection)
-
-		pred_bbox_points = torch.cat([xs.view(-1, 1), ys.view(-1, 1)], dim=1)
-		pred_regression_pois = select_point_of_interest(batch, indexs, pred_regression).view(-1, pred_regression.shape[1])
+		scores, clses, pred_bbox_points = predictions['scores'], predictions['clses'], predictions['proj_points'].squeeze(0)
+		pred_regression_pois = pred_regression.view(-1, pred_regression.shape[1])
 
 		# thresholding with score
 		scores = scores.view(-1)

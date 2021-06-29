@@ -118,9 +118,8 @@ class Loss_Computation():
 
 		return heatmaps, return_dict
 
-	def prepare_predictions(self, targets_variables, predictions):
-		pred_regression = predictions['reg']
-		batch, channel, feat_h, feat_w = pred_regression.shape
+	def prepare_predictions(self, targets_variables, pred_regression):
+		batch, _, channel = pred_regression.shape
 
 		# 1. get the representative points
 		targets_bbox_points = targets_variables["target_centers"] # representative points
@@ -162,7 +161,7 @@ class Loss_Computation():
 		obj_weights = targets_variables["reg_weight"].view(-1)[flatten_reg_mask_gt]
 
 		# 2. extract corresponding predictions
-		pred_regression_pois_3D = select_point_of_interest(batch, targets_bbox_points, pred_regression).view(-1, channel)[flatten_reg_mask_gt]
+		pred_regression_pois_3D = pred_regression.view(-1, channel)[flatten_reg_mask_gt]
 		
 		pred_regression_2D = F.relu(pred_regression_pois_3D[mask_regression_2D, self.key2channel('2d_dim')])
 		pred_offset_3D = pred_regression_pois_3D[:, self.key2channel('3d_offset')]
@@ -258,10 +257,8 @@ class Loss_Computation():
 		return targets, preds, reg_nums, weights
 
 	def __call__(self, predictions, targets):
-		targets_heatmap, targets_variables = self.prepare_targets(targets)
-
-		pred_heatmap = predictions['cls']
-		pred_targets, preds, reg_nums, weights = self.prepare_predictions(targets_variables, predictions)
+		pred_heatmap, output_regs, targets_heatmap, targets_variables = predictions[0], predictions[1], predictions[2], predictions[3]
+		pred_targets, preds, reg_nums, weights = self.prepare_predictions(targets_variables, output_regs)
 
 		# heatmap loss
 		if self.heatmap_type == 'centernet':
