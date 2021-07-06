@@ -88,7 +88,7 @@ class _predictor(nn.Module):
             self.offset3d_head = nn.Sequential(
                 nn.Conv2d(in_channels, self.head_conv, kernel_size=3, padding=1, bias=False),
                 InPlaceABN(self.head_conv, momentum=self.bn_momentum, activation=self.abn_activision),
-                nn.Conv2d(self.head_conv, 2, kernel_size=1, padding=1 // 2, bias=True)
+                nn.Conv2d(self.head_conv + 384, 2, kernel_size=1, padding=1 // 2, bias=True)
             )
         else:
             self.box2d_head = nn.Sequential(
@@ -109,7 +109,7 @@ class _predictor(nn.Module):
             self.offset3d_head = nn.Sequential(
                 nn.Conv2d(in_channels, self.head_conv, kernel_size=3, padding=1, bias=False),
                 norm_func(self.head_conv, momentum=self.bn_momentum), nn.ReLU(inplace=True),
-                nn.Conv2d(self.head_conv, 2, kernel_size=1, padding=1 // 2, bias=True),
+                nn.Conv2d(self.head_conv + 384, 2, kernel_size=1, padding=1 // 2, bias=True),
             )
         _fill_fc_weights(self.box2d_head, 0)
         _fill_fc_weights(self.box3d_head, 0)
@@ -147,7 +147,8 @@ class _predictor(nn.Module):
         
         output_regs = []
         feature_offset3d = self.offset3d_head[:-1](up_level4)
-        output_offset3d = self.offset3d_head[-1](feature_offset3d)
+        edge_offset3d = torch.zeros((feature_offset3d.shape[0], 2, feature_offset3d.shape[2], feature_offset3d.shape[3]), device=feature_offset3d.device)
+        # output_offset3d = self.offset3d_head[-1](feature_offset3d)
         if self.enable_edge_fusion:
             edge_indices = torch.stack([t.get_field("edge_indices") for t in targets]) # B x K x 2
             edge_lens = torch.stack([t.get_field("edge_len") for t in targets]) # B 
@@ -165,7 +166,7 @@ class _predictor(nn.Module):
             for k in range(b):
                 edge_indice_k = edge_indices[k, :edge_lens[k]]
                 output_cls[k, :, edge_indice_k[:, 1], edge_indice_k[:, 0]] += edge_cls_output[k, :, :edge_lens[k]]
-                output_offset3d[k, :, edge_indice_k[:, 1], edge_indice_k[:, 0]] += edge_offset_output[k, :, :edge_lens[k]]
+                edge_offset3d[k, :, edge_indice_k[:, 1], edge_indice_k[:, 0]] += edge_offset_output[k, :, :edge_lens[k]]
 
         feature_box2d = self.box2d_head[:-1](up_level4)
         feature_box3d = self.box3d_head[:-1](up_level4)
@@ -189,10 +190,13 @@ class _predictor(nn.Module):
         # 1/16 [N, K, 256]
         up_level16_pois = select_point_of_interest(b, proj_points_16, up_level16)
 
+        feature_offset3d_pois = select_point_of_interest(b, proj_points, feature_offset3d)
         feature_box2d_pois = select_point_of_interest(b, proj_points, feature_box2d)
         feature_box3d_pois = select_point_of_interest(b, proj_points, feature_box3d)
         feature_corners_pois = select_point_of_interest(b, proj_points, feature_corners)
         
+        # [N, K. 640]
+        feature_offset3d_pois = torch.cat((feature_offset3d_pois, up_level8_pois, up_level16_pois), dim=-1)
         # [N, K. 640]
         feature_box2d_pois = torch.cat((feature_box2d_pois, up_level8_pois, up_level16_pois), dim=-1)
         # [N, K, 640]
@@ -201,12 +205,16 @@ class _predictor(nn.Module):
         feature_corners_pois = torch.cat((feature_corners_pois, up_level8_pois, up_level16_pois), dim=-1)
         
         # [N, 640, K, 1]
+        feature_offset3d_pois = feature_offset3d_pois.permute(0, 2, 1).contiguous().unsqueeze(-1)
+        # [N, 640, K, 1]
         feature_box2d_pois = feature_box2d_pois.permute(0, 2, 1).contiguous().unsqueeze(-1)
         # [N, 640, K, 1]
         feature_box3d_pois = feature_box3d_pois.permute(0, 2, 1).contiguous().unsqueeze(-1)
         # [N, 640, K, 1]
         feature_corners_pois = feature_corners_pois.permute(0, 2, 1).contiguous().unsqueeze(-1)
         
+        # [N, C, K, 1]
+        output_offset3d = self.offset3d_head[-1](feature_offset3d_pois)
         # [N, C, K, 1]
         output_box2d = self.box2d_head[-1](feature_box2d_pois)
         # [N, C, K, 1]
@@ -215,6 +223,8 @@ class _predictor(nn.Module):
         output_corners = self.corners_head[-1](feature_corners_pois)
 
         # [N, K, C]
+        output_offset3d = output_offset3d.squeeze(-1).permute(0, 2, 1).contiguous()
+        # [N, K, C]
         output_box2d = output_box2d.squeeze(-1).permute(0, 2, 1).contiguous()
         # [N, K, C]
         output_box3d = output_box3d.squeeze(-1).permute(0, 2, 1).contiguous()
@@ -222,15 +232,11 @@ class _predictor(nn.Module):
         output_corners = output_corners.squeeze(-1).permute(0, 2, 1).contiguous()
 
         # [N, K, 2]
-        output_offset3d_pois = select_point_of_interest(b, proj_points, output_offset3d)
-
-        output_regs.append(output_box2d)
-        output_regs.append(output_offset3d_pois)
-        output_regs.append(output_corners)
-        output_regs.append(output_box3d)
+        output_offset3d_edge = select_point_of_interest(b, proj_points, edge_offset3d)
+        output_offset3d += output_offset3d_edge
 
         # [N, K, 50]
-        output_regs = torch.cat((output_box2d, output_offset3d_pois, output_corners, output_box3d), dim=-1)
+        output_regs = torch.cat((output_box2d, output_offset3d, output_corners, output_box3d), dim=-1)
         if self.training:
             return [output_cls,  output_regs, targets_heatmap, targets_variables]
         else:
