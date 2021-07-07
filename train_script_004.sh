@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=6 python tools/plain_train_net.py --batch_size 8 --backbone RESNET-18 --output checkpoints/RESNET-18_MergeHead_Lite-FPN_FULL_004nd
+CUDA_VISIBLE_DEVICES=5 python tools/plain_train_net.py --batch_size 8 --backbone RESNET-18 --output checkpoints/RESNET-18_MergeHead_Lite-FPN_3DBOX_TRUNC_004nd

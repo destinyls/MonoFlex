@@ -26,10 +26,10 @@ MODEL:
     CONV_BODY: "dla34"
   INPLACE_ABN: True
   HEAD:
-    REGRESSION_HEADS: [['2d_dim'], ['3d_offset'], ['corner_offset'], ['corner_uncertainty'], ['3d_dim'], ['ori_cls', 'ori_offset'], ['depth'], ['depth_uncertainty']]
-    REGRESSION_CHANNELS: [[4, ], [2, ], [20], [3], [3, ], [8, 8], [1, ], [1, ]]
-    REGRESSION_MERGE_HEADS: [['2d_dim'], ['3d_offset'], ['corners'], ['box_3d']]
-    REGRESSION_MERGE_CHANNELS: [[4, ], [2, ], [23,], [21,]]
+    REGRESSION_HEADS: [['2d_dim'], ['corner_offset'], ['corner_uncertainty'], ['3d_offset'], ['3d_dim'], ['ori_cls', 'ori_offset'], ['depth'], ['depth_uncertainty']]
+    REGRESSION_CHANNELS: [[4, ], [20], [3],  [2, ], [3, ], [8, 8], [1, ], [1, ]]
+    REGRESSION_MERGE_HEADS: [['2d_dim'],  ['corners'], ['box_3d']]
+    REGRESSION_MERGE_CHANNELS: [[4, ], [23,], [23,]]
 
     ENABLE_EDGE_FUSION: True
     TRUNCATION_OUTPUT_FUSION: 'add'
