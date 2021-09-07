@@ -60,7 +60,7 @@ def refresh_attributes(calib):
 
 class Object3d(object):
     """ 3d object label """
-
+    '''
     def __init__(self, label_file_line):
         data = label_file_line.split(" ")
         data[1:] = [float(x) for x in data[1:]]
@@ -91,6 +91,39 @@ class Object3d(object):
         self.real_alpha = data[3]
         self.ray = math.atan2(self.t[0], self.t[2])
         self.alpha = convertRot2Alpha(self.ry, self.t[2], self.t[0])
+
+        # difficulty level 
+        self.level_str = None
+        self.level = self.get_kitti_obj_level()
+        '''
+
+    def __init__(self, anno_ins):
+        # extract label, truncation, occlusion
+        self.type = anno_ins["name"]                # 'Car', 'Pedestrian', ...
+        self.truncation = anno_ins["truncated"]     # truncated pixel ratio [0..1]
+        self.occlusion = int(anno_ins["occluded"])  # 0=visible, 1=partly occluded, 2=fully occluded, 3=unknown
+
+        # extract 2d bounding box in 0-based coordinates
+        self.xmin = anno_ins["bbox"][0]  # left
+        self.ymin = anno_ins["bbox"][1]  # top
+        self.xmax = anno_ins["bbox"][2]  # right
+        self.ymax = anno_ins["bbox"][3]  # bottom
+        self.box2d = np.array([self.xmin, self.ymin, self.xmax, self.ymax], dtype=np.float32)
+
+        # extract 3d bounding box information
+        # lhw
+        self.h = anno_ins["dim"][1]  # box height   
+        self.w = anno_ins["dim"][2]  # box width
+        self.l = anno_ins["dim"][0]  # box length (in meters)
+        self.t = anno_ins["loc"]     # location (x,y,z) in camera coord.
+
+        self.dis_to_cam = np.linalg.norm(self.t)
+
+        self.ry = anno_ins["roty"]  # yaw angle (around Y-axis in camera coordinates) [-pi..pi]
+        self.real_alpha = anno_ins["alpha"]
+        self.ray = math.atan2(self.t[0], self.t[2])
+        self.alpha = convertRot2Alpha(self.ry, self.t[2], self.t[0])
+        self.P = anno_ins["P"]
 
         # difficulty level 
         self.level_str = None
@@ -189,7 +222,7 @@ class Calibration(object):
 
         TODO(rqi): do matrix multiplication only once for each projection.
     """
-
+    '''
     def __init__(self, calib_filepath, from_video=False, use_right_cam=False):
         if from_video:
             calibs = self.read_calib_from_video(calib_filepath)
@@ -216,7 +249,28 @@ class Calibration(object):
         self.f_v = self.P[1, 1]
         self.b_x = self.P[0, 3] / (-self.f_u)  # relative
         self.b_y = self.P[1, 3] / (-self.f_v)
+    '''
+    def __init__(self, P):
+        # Projection matrix from rect camera coord to image coord
+        self.P = np.reshape(P[:3, :], [3, 4])
+        
+        # Rigid transform from Velodyne coord to reference camera coord
+        self.V2C = np.zeros((3, 4))
+        self.V2C = np.reshape(self.V2C, [3, 4])
+        self.C2V = inverse_rigid_trans(self.V2C)
+        
+        # Rotation from reference camera coord to rect camera coord
+        self.R0 = np.zeros((3, 3))
+        self.R0 = np.reshape(self.R0, [3, 3])
 
+        # Camera intrinsics and extrinsics
+        self.c_u = self.P[0, 2]
+        self.c_v = self.P[1, 2]
+        self.f_u = self.P[0, 0]
+        self.f_v = self.P[1, 1]
+        self.b_x = self.P[0, 3] / (-self.f_u)  # relative
+        self.b_y = self.P[1, 3] / (-self.f_v)
+    
     def read_calib_file(self, filepath):
         """ Read in a calibration file and parse into a dictionary.
         Ref: https://github.com/utiasSTARS/pykitti/blob/master/pykitti/utils.py
@@ -368,6 +422,9 @@ class Calibration(object):
 
         return pts_3d_rect
 
+    def get_calib(self):
+        return self.P
+
     def project_image_to_velo(self, uv_depth):
         pts_3d_rect = self.project_image_to_rect(uv_depth)
         return self.project_rect_to_velo(pts_3d_rect)
@@ -439,12 +496,15 @@ def inverse_rigid_trans(Tr):
     inv_Tr[0:3, 3] = np.dot(-np.transpose(Tr[0:3, 0:3]), Tr[0:3, 3])
     return inv_Tr
 
-
+'''
 def read_label(label_filename):
     lines = [line.rstrip() for line in open(label_filename)]
     objects = [Object3d(line) for line in lines]
     return objects
-
+'''
+def read_label(annos):
+    objects = [Object3d(anno) for anno in annos]
+    return objects
 
 def load_image(img_filename):
     return cv2.imread(img_filename)

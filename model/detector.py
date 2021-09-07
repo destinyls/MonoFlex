@@ -23,7 +23,7 @@ class KeypointDetector(nn.Module):
         else:
           self.backbone = get_resnet(cfg)
         self.heads = bulid_head(cfg, self.backbone.out_channels)
-        self.test = cfg.DATASETS.TEST_SPLIT == 'test'
+        self.test = cfg.DATASETS.TEST_SPLIT in ['test', 'val']
 
     def forward(self, images, targets=None):
         if self.training and targets is None:

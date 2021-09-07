@@ -86,6 +86,6 @@ SOLVER:
 TEST:
   UNCERTAINTY_AS_CONFIDENCE: True
   DETECTIONS_THRESHOLD: 0.2
-  METRIC: ['R40']
+  METRIC: ['R11']
 
 OUTPUT_DIR: "./output/toy_experiments"

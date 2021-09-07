@@ -7,7 +7,6 @@ nohup.out
 model/backbone/DCNv2/
 monoflex.egg-info/
 checkpoints/
-datasets/
 build/
 output/
 _ext.*
