@@ -53,9 +53,10 @@ class PostProcessor(nn.Module):
 	def prepare_targets(self, targets, test):
 		pad_size = torch.stack([t.get_field("pad_size") for t in targets])
 		calibs = [t.get_field("calib") for t in targets]
+		Ps = torch.stack([t.get_field("Ps") for t in targets])
 		size = torch.stack([torch.tensor(t.size) for t in targets])
 
-		if test: return dict(calib=calibs, size=size, pad_size=pad_size)
+		if test: return dict(calib=calibs, size=size, pad_size=pad_size, Ps=Ps)
 
 		cls_ids = torch.stack([t.get_field("cls_ids") for t in targets])
 		# regression locations (in pixels)
@@ -68,18 +69,16 @@ class PostProcessor(nn.Module):
 		offset_3D = torch.stack([t.get_field("offset_3D") for t in targets])
 		# reg mask
 		reg_mask = torch.stack([t.get_field("reg_mask") for t in targets])
-
 		target_varibales = dict(pad_size=pad_size, calib=calibs, size=size, cls_ids=cls_ids, target_centers=target_centers,
-							dimensions=dimensions, rotys=rotys, locations=locations, offset_3D=offset_3D, reg_mask=reg_mask)
+							dimensions=dimensions, rotys=rotys, locations=locations, offset_3D=offset_3D, reg_mask=reg_mask, Ps=Ps)
 
 		return target_varibales
 
 	def forward(self, predictions, targets, features=None, test=False, refine_module=None):
 		pred_heatmap, pred_regression = predictions['cls'], predictions['reg']
 		batch = pred_heatmap.shape[0]
-
 		target_varibales = self.prepare_targets(targets, test=test)
-		calib, pad_size = target_varibales['calib'], target_varibales['pad_size']
+		calib, Ps, pad_size = target_varibales['calib'], target_varibales['Ps'], target_varibales['pad_size']
 		img_size = target_varibales['size']
 
 		# evaluate the disentangling IoU for each components in (location, dimension, orientation)
@@ -101,7 +100,6 @@ class PostProcessor(nn.Module):
 		# thresholding with score
 		scores = scores.view(-1)
 		valid_mask = scores >= self.det_threshold
-
 		# no valid predictions
 		if valid_mask.sum() == 0:
 			result = scores.new_zeros(0, 14)
@@ -115,6 +113,7 @@ class PostProcessor(nn.Module):
 		scores = scores[valid_mask]
 		
 		clses = clses.view(-1)[valid_mask]
+		Ps = Ps.view(-1, 4, 4)[valid_mask]
 		pred_bbox_points = pred_bbox_points[valid_mask]
 		pred_regression_pois = pred_regression_pois[valid_mask]
 
@@ -139,7 +138,7 @@ class PostProcessor(nn.Module):
 			pred_keypoint_offset = pred_regression_pois[:, self.key2channel('corner_offset')]
 			pred_keypoint_offset = pred_keypoint_offset.view(-1, 10, 2)
 			# solve depth from estimated key-points
-			pred_keypoints_depths = self.anno_encoder.decode_depth_from_keypoints_batch(pred_keypoint_offset, pred_dimensions, calib)
+			pred_keypoints_depths = self.anno_encoder.decode_depth_from_keypoints_batch(pred_keypoint_offset, pred_dimensions, Ps)
 			visualize_preds['keypoints'] = pred_keypoint_offset
 
 		if self.keypoint_depth_with_uncertainty:
@@ -207,9 +206,9 @@ class PostProcessor(nn.Module):
 			elif self.output_depth == 'oracle':
 				pred_depths, estimated_depth_error = self.get_oracle_depths(pred_box2d, clses, pred_combined_depths, 
 																pred_combined_uncertainty, targets[0])
-
+        
 		batch_idxs = pred_depths.new_zeros(pred_depths.shape[0]).long()
-		pred_locations = self.anno_encoder.decode_location_flatten(pred_bbox_points, pred_offset_3D, pred_depths, calib, pad_size, batch_idxs)
+		pred_locations = self.anno_encoder.decode_location_flatten(pred_bbox_points, pred_offset_3D, pred_depths, Ps, pad_size, batch_idxs)
 		pred_rotys, pred_alphas = self.anno_encoder.decode_axes_orientation(pred_orientation, pred_locations)
 
 		pred_locations[:, 1] += pred_dimensions[:, 1] / 2
@@ -378,7 +377,6 @@ class PostProcessor(nn.Module):
 		pred_dimensions_offsets = pred_regression_pois[:, self.key2channel('3d_dim')]
 		pred_orientation = torch.cat((pred_regression_pois[:, self.key2channel('ori_cls')], pred_regression_pois[:, self.key2channel('ori_offset')]), dim=1)
 		pred_keypoint_offset = pred_regression_pois[:, self.key2channel('corner_offset')].view(-1, 10, 2)
-
 
 		# 3. get ground-truth
 		target_clses = targets['cls_ids'].view(-1)[reg_mask]
