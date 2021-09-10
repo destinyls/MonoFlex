@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=1 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --output output/DLA-34_Baseline_MergeHead_SCH2_001nd
+CUDA_VISIBLE_DEVICES=0,1 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --gpu 0,1 --num_gpus 2 --output output/DLA-34_BCPV2.0_Step_5_BCP_FLIP_FUSION_48666_001nd

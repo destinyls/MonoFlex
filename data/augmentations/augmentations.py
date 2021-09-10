@@ -12,24 +12,26 @@ class Compose(object):
         self.augmentations = augmentations
         self.PIL2Numpy = False
 
-    def __call__(self, img, objs, calib):
+    def __call__(self, img, objs, use_right, use_bcp):
         if isinstance(img, np.ndarray):
             img = Image.fromarray(img, mode="RGB")
             self.PIL2Numpy = True
-
+        
         for a in self.augmentations:
-            img, objs, calib = a(img, objs, calib)
+            img, objs = a(img, objs, use_right, use_bcp)
 
         if self.PIL2Numpy:
             img = np.array(img)
 
-        return img, objs, calib
+        return img, objs
 
 class RandomHorizontallyFlip(object):
     def __init__(self, p):
         self.p = p
 
-    def __call__(self, img, objs, calib):
+    def __call__(self, img, objs, use_right, use_bcp):
+        if use_right or use_bcp:
+            return img, objs
         if random.random() < self.p:
             # flip image
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
@@ -71,16 +73,21 @@ class RandomHorizontallyFlip(object):
                 loc = obj.t.copy()
                 loc[0] = -loc[0]
                 obj.t = loc
-                
                 obj.alpha = convertRot2Alpha(roty, obj.t[2], obj.t[0])
+
+                # fliped P
+                P2 = obj.P.copy()
+                P2[0, 2] = img_w - P2[0, 2] - 1
+                P2[0, 3] = - P2[0, 3]
+                obj.P = P2
                 objs[idx] = obj
 
-            # flip calib
-            P2 = calib.P.copy()
-            P2[0, 2] = img_w - P2[0, 2] - 1
-            P2[0, 3] = - P2[0, 3]
-            calib.P = P2
-            refresh_attributes(calib)
+        #   flip calib
+        #   P2 = calib.P.copy()
+        #   P2[0, 2] = img_w - P2[0, 2] - 1
+        #   P2[0, 3] = - P2[0, 3]
+        #   calib.P = P2
+        #   refresh_attributes(calib)
 
         #     flip_calib = copy.deepcopy(calib)
         #     if self.flip_calibration:
@@ -122,4 +129,4 @@ class RandomHorizontallyFlip(object):
         # else:
         #     flip_calib = calib
 
-        return img, objs, calib
+        return img, objs

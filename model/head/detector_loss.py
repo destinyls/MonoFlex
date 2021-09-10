@@ -105,7 +105,6 @@ class Loss_Computation():
 
         # utils
         pad_size = torch.stack([t.get_field("pad_size") for t in targets])
-        calibs = [t.get_field("calib") for t in targets]
         reg_mask = torch.stack([t.get_field("reg_mask") for t in targets])
         reg_weight = torch.stack([t.get_field("reg_weight") for t in targets])
         ori_imgs = torch.stack([t.get_field("ori_img") for t in targets])
@@ -113,7 +112,7 @@ class Loss_Computation():
         Ps = torch.stack([t.get_field("Ps") for t in targets])
 
         return_dict = dict(cls_ids=cls_ids, target_centers=target_centers, bboxes=bboxes, keypoints=keypoints, dimensions=dimensions,
-                    locations=locations, rotys=rotys, alphas=alphas, calib=calibs, pad_size=pad_size, reg_mask=reg_mask, reg_weight=reg_weight,
+                    locations=locations, rotys=rotys, alphas=alphas, pad_size=pad_size, reg_mask=reg_mask, reg_weight=reg_weight,
                     offset_3D=offset_3D, ori_imgs=ori_imgs, trunc_mask=trunc_mask, orientations=orientations, keypoints_depth_mask=keypoints_depth_mask,
                     Ps=Ps)
 

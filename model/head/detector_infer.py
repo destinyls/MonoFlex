@@ -52,11 +52,10 @@ class PostProcessor(nn.Module):
 
 	def prepare_targets(self, targets, test):
 		pad_size = torch.stack([t.get_field("pad_size") for t in targets])
-		calibs = [t.get_field("calib") for t in targets]
 		Ps = torch.stack([t.get_field("Ps") for t in targets])
 		size = torch.stack([torch.tensor(t.size) for t in targets])
 
-		if test: return dict(calib=calibs, size=size, pad_size=pad_size, Ps=Ps)
+		if test: return dict(size=size, pad_size=pad_size, Ps=Ps)
 
 		cls_ids = torch.stack([t.get_field("cls_ids") for t in targets])
 		# regression locations (in pixels)
@@ -69,7 +68,7 @@ class PostProcessor(nn.Module):
 		offset_3D = torch.stack([t.get_field("offset_3D") for t in targets])
 		# reg mask
 		reg_mask = torch.stack([t.get_field("reg_mask") for t in targets])
-		target_varibales = dict(pad_size=pad_size, calib=calibs, size=size, cls_ids=cls_ids, target_centers=target_centers,
+		target_varibales = dict(pad_size=pad_size, size=size, cls_ids=cls_ids, target_centers=target_centers,
 							dimensions=dimensions, rotys=rotys, locations=locations, offset_3D=offset_3D, reg_mask=reg_mask, Ps=Ps)
 
 		return target_varibales
@@ -78,7 +77,7 @@ class PostProcessor(nn.Module):
 		pred_heatmap, pred_regression = predictions['cls'], predictions['reg']
 		batch = pred_heatmap.shape[0]
 		target_varibales = self.prepare_targets(targets, test=test)
-		calib, Ps, pad_size = target_varibales['calib'], target_varibales['Ps'], target_varibales['pad_size']
+		Ps, pad_size = target_varibales['Ps'], target_varibales['pad_size']
 		img_size = target_varibales['size']
 
 		# evaluate the disentangling IoU for each components in (location, dimension, orientation)
@@ -236,7 +235,6 @@ class PostProcessor(nn.Module):
 		return result, eval_utils, visualize_preds
 
 	def get_oracle_depths(self, pred_bboxes, pred_clses, pred_combined_depths, pred_combined_uncertainty, target):
-		calib = target.get_field('calib')
 		pad_size = target.get_field('pad_size')
 		pad_w, pad_h = pad_size
 

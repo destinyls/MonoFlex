@@ -1,2 +1,1 @@
-CUDA_VISIBLE_DEVICES=3,4 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --gpu 0,4 --num_gpus 2 --output output/DLA-34_BCP_Sterp2_Ps_4_GPUS_001nd
-
+CUDA_VISIBLE_DEVICES=0,1,2,3 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --gpu 0,1,2,3 --num_gpus 4 --output output/DLA-34_BCPV2.0_Step_5_RIGHT_BCP_FLIP_FUSION_3712_DIFFIRENT_AUG_FIXBUG_48666_002nd

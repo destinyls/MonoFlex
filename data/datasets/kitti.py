@@ -231,21 +231,28 @@ class KITTIDataset(Dataset):
 
         return Image.fromarray(ret_img.astype(np.uint8)), pad_size
 
+    def project_rect_to_image(self, pts_3d_rect, P):
+        n = pts_3d_rect.shape[0]
+        pts_3d_rect = np.hstack((pts_3d_rect, np.ones((n, 1))))
+        pts_2d = np.dot(pts_3d_rect, np.transpose(P))  # nx3
+        pts_2d[:, 0] /= pts_2d[:, 2]
+        pts_2d[:, 1] /= pts_2d[:, 2]
+        return pts_2d[:, 0:2], pts_2d[:, 2]
+
     def __getitem__(self, idx):
         use_right = False
         if self.is_train:
-            img, use_right, P, embedding_annos, image_idx = self.aug_dataset[idx]
+            img, P, use_right, use_bcp, embedding_annos, image_idx = self.aug_dataset[idx]
         else:
             img, P, image_idx = self.aug_dataset[idx]
         original_idx = "{:06d}".format(image_idx)
-        calib = self.get_calibration(P)
         objs = None if self.split in ['test', "val"] else self.get_label_objects(embedding_annos)
         
         if self.split == 'train':
             objs = self.filtrate_objects(objs) # remove objects of irrelevant classes
         # random horizontal flip
         if self.augmentation is not None:
-            img, objs, calib = self.augmentation(img, objs, calib)
+            img, objs = self.augmentation(img, objs, use_right, use_bcp)
 
         # pad image
         img_before_aug_pad = np.array(img).copy()
@@ -273,7 +280,6 @@ class KITTIDataset(Dataset):
             Ps[:] = P
             target.add_field("Ps", Ps)
             target.add_field("pad_size", pad_size)
-            target.add_field("calib", calib)
             target.add_field("ori_img", ori_img)
             if self.enable_edge_fusion:
                 target.add_field('edge_len', input_edge_count)
@@ -345,7 +351,7 @@ class KITTIDataset(Dataset):
 
             # generate 8 corners of 3d bbox
             corners_3d = obj.generate_corners3d()
-            corners_2d, _ = calib.project_rect_to_image(corners_3d)
+            corners_2d, _ = self.project_rect_to_image(corners_3d, obj.P)
             projected_box2d = np.array([corners_2d[:, 0].min(), corners_2d[:, 1].min(),
                                         corners_2d[:, 0].max(), corners_2d[:, 1].max()])
 
@@ -363,7 +369,7 @@ class KITTIDataset(Dataset):
                     if float_truncation >= self.filter_params[0] and (box2d[2:] - box2d[:2]).min() <= self.filter_params[1]: continue
 
             # project 3d location to the image plane
-            proj_center, depth = calib.project_rect_to_image(locs.reshape(-1, 3))
+            proj_center, depth = self.project_rect_to_image(locs.reshape(-1, 3), obj.P)
             proj_center = proj_center[0]
 
             # generate approximate projected center when it is outside the image
@@ -387,7 +393,7 @@ class KITTIDataset(Dataset):
             # 10 keypoints
             bot_top_centers = np.stack((corners_3d[:4].mean(axis=0), corners_3d[4:].mean(axis=0)), axis=0)
             keypoints_3D = np.concatenate((corners_3d, bot_top_centers), axis=0)
-            keypoints_2D, _ = calib.project_rect_to_image(keypoints_3D)
+            keypoints_2D, _ = self.project_rect_to_image(keypoints_3D, obj.P)
 
             # keypoints mask: keypoint must be inside the image and in front of the camera
             keypoints_x_visible = (keypoints_2D[:, 0] >= 0) & (keypoints_2D[:, 0] <= img_w - 1)
@@ -492,7 +498,6 @@ class KITTIDataset(Dataset):
         target.add_field("keypoints_depth_mask", keypoints_depth_mask)
         target.add_field("dimensions", dimensions)
         target.add_field("locations", locations)
-        target.add_field("calib", calib)
         target.add_field("reg_mask", reg_mask)
         target.add_field("reg_weight", reg_weight)
         target.add_field("offset_3D", offset_3D)
