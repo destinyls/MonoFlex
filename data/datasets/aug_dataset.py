@@ -24,14 +24,14 @@ class AUGDataset():
 
         if self.split == "train":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_train.pkl")
-            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_48666.pkl")
+            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test.pkl")
         elif self.split == "val":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_val.pkl")
         elif self.split == "trainval":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_trainval.pkl")
             db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test.pkl")
         elif self.split == "test":
-            info_path = os.path.join(self.kitti_root, "../kitti_infos_test_7518.pkl")
+            info_path = os.path.join(self.kitti_root, "../kitti_infos_test.pkl")
         else:
             raise ValueError("Invalid split!")
 
@@ -127,8 +127,6 @@ class AUGDataset():
                         P = ins["P2"]
                     
                     if ins['difficulty'] > 0:
-                        continue
-                    if ins['score'] < 0.75:
                         continue
                     if len(init_bboxes.shape) > 1:
                         ious = kitti.iou(init_bboxes, box2d[np.newaxis, ...])

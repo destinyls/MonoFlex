@@ -2,7 +2,7 @@ DATASETS:
   DETECT_CLASSES: ("Car", "Pedestrian", "Cyclist")
   TRAIN: ("kitti_train",)
   TEST: ("kitti_train",)
-  TRAIN_SPLIT: "train"
+  TRAIN_SPLIT: "trainval"
   TEST_SPLIT: "val"
 
   USE_RIGHT_IMAGE: False
