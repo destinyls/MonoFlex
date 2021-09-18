@@ -59,6 +59,7 @@ def do_eval(cfg, model, data_loaders_val, iteration, depth_method):
 		eval_types=eval_types,
 		device=cfg.MODEL.DEVICE,
 		output_folder=output_folder,
+		metrics=cfg.TEST.METRIC,
 	)
 	comm.synchronize()
 

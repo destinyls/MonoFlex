@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=4,5 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --gpu 4,5 --num_gpus 4 --output output/DLA-34_BCPV2.0_Step_5_RIGHT_BCP_FLIP_FUSION_3712_DIFFIRENT_AUG_FIXBUG_48666_002nd --ckpt output/DLA-34_BCPV2.0_Step_5_RIGHT_BCP_FLIP_FUSION_3712_DIFFIRENT_AUG_FIXBUG_48666_002nd/model_checkpoint_46400.pth
+CUDA_VISIBLE_DEVICES=7 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --output output/DLA-34_BASELINE_TRAINVAL_001nd

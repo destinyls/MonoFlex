@@ -1,9 +1,9 @@
 DATASETS:
   DETECT_CLASSES: ("Car", "Pedestrian", "Cyclist")
   TRAIN: ("kitti_train",)
-  TEST: ("kitti_train",)
+  TEST: ("kitti_test",)
   TRAIN_SPLIT: "trainval"
-  TEST_SPLIT: "val"
+  TEST_SPLIT: "test"
 
   USE_RIGHT_IMAGE: False
   CONSIDER_OUTSIDE_OBJS: True
@@ -88,4 +88,4 @@ TEST:
   DETECTIONS_THRESHOLD: 0.2
   METRIC: ['R11']
 
-OUTPUT_DIR: "./output/toy_experiments"
+OUTPUT_DIR: "./output/toy_experiments" 

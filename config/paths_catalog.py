@@ -7,7 +7,7 @@ class DatasetCatalog():
             "root": "kitti/training/",
         },
         "kitti_test": {
-            "root": "kitti/testing/",
+            "root": "kitti/testing_7518/",
         },
 
     }

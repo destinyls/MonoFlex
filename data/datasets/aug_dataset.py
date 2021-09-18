@@ -17,21 +17,19 @@ class AUGDataset():
         self.max_objs = cfg.DATASETS.MAX_OBJECTS
         self.classes = cfg.DATASETS.DETECT_CLASSES
 
-        self.aug_prob = 0.0
-        self.shift_scale = (0.2, 0.4)
         self.right_prob = 0.5
         self.bcp_prob = 0.5
 
         if self.split == "train":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_train.pkl")
-            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test.pkl")
+            db_info_path = os.path.join(self.kitti_root, "../kitti_infos_test_monoflex_55165_union.pkl")
         elif self.split == "val":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_val.pkl")
         elif self.split == "trainval":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_trainval.pkl")
-            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test.pkl")
+            db_info_path = os.path.join(self.kitti_root, "../kitti_infos_test_monoflex_55165_union.pkl")
         elif self.split == "test":
-            info_path = os.path.join(self.kitti_root, "../kitti_infos_test.pkl")
+            info_path = os.path.join(self.kitti_root, "../kitti_infos_test_7518.pkl")
         else:
             raise ValueError("Invalid split!")
 
