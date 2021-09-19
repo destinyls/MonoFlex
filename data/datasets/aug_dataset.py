@@ -8,6 +8,18 @@ from random import sample
 from PIL import Image
 from data.datasets import kitti_common as kitti
 
+TYPE_ID_CONVERSION = {
+    'Car': 0,
+    'Cyclist': 1,
+    'Pedestrian': 2,
+    'Van': 3,
+    'Person_sitting': 4,
+    'Truck': 5,
+    'Tram': 6,
+    'Misc': 7,
+    'DontCare': -1,
+}
+
 class AUGDataset():
     def __init__(self, cfg, kitti_root, is_train=True, split="train"):
         super(AUGDataset, self).__init__()
@@ -22,12 +34,12 @@ class AUGDataset():
 
         if self.split == "train":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_train.pkl")
-            db_info_path = os.path.join(self.kitti_root, "../kitti_infos_test_monoflex_55165_union.pkl")
+            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_31552_006nd.pkl")
         elif self.split == "val":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_val.pkl")
         elif self.split == "trainval":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_trainval.pkl")
-            db_info_path = os.path.join(self.kitti_root, "../kitti_infos_test_monoflex_55165_union.pkl")
+            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_trainval.pkl")
         elif self.split == "test":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_test_7518.pkl")
         else:
@@ -40,6 +52,30 @@ class AUGDataset():
         if self.is_train:
             with open(db_info_path, 'rb') as f:
                 self.db_infos = pickle.load(f)
+
+            self.sample_nums_hashmap = dict()
+            self.sample_counter = dict()
+            for class_name, class_db_infos in self.db_infos.items():
+                self.sample_nums_hashmap[class_name] = {}
+                self.sample_counter[class_name] = {}
+                for img_shape_key, class_shape_db_infos in class_db_infos.items():
+                    self.sample_nums_hashmap[class_name][img_shape_key] = len(class_shape_db_infos)
+                    self.sample_counter[class_name][img_shape_key] = 0
+        
+        self.class_aug_nums = {"Car": 18, "Pedestrian": 9, "Cyclist": 9}
+    
+    def reset_sample_counter(self):
+        for class_name, class_counter in self.sample_counter.items():
+            for img_shape_key, class_shape_counter in class_counter.items():
+                self.sample_counter[class_name][img_shape_key] = 0
+
+    def update_sample_counter(self, aug_class, img_shape_key):
+        total_nums = self.sample_nums_hashmap[aug_class][img_shape_key]
+        current_nums = self.sample_counter[aug_class][img_shape_key]
+        if current_nums < total_nums - 1:
+            self.sample_counter[aug_class][img_shape_key] = current_nums + 1
+        else:
+            self.sample_counter[aug_class][img_shape_key] = 0
 
     def __len__(self):
         return self.num_samples
@@ -59,7 +95,6 @@ class AUGDataset():
         img_size = [img.shape[1], img.shape[0]]
         center = np.array([i / 2 for i in img_size], dtype=np.float32)
         size = np.array([i for i in img_size], dtype=np.float32)
-        class_to_label = kitti.get_class_to_label_map()
 
         if not self.is_train:
             img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -86,7 +121,7 @@ class AUGDataset():
                 continue
             ins_anno = {
                     "name": names[i],
-                    "label": class_to_label[names[i]],
+                    "label": TYPE_ID_CONVERSION[names[i]],
                     "bbox": bboxes[i],
                     "alpha": alphas[i],
                     "dim": dimensions[i],
@@ -107,50 +142,56 @@ class AUGDataset():
             use_bcp = True
 
         if use_bcp:
-            aug_class = "Car"
-            img_shape_key = f"{img.shape[0]}_{img.shape[1]}"
             ori_annos_num = len(embedding_annos)
-            if img_shape_key in self.db_infos[aug_class].keys():
-                class_db_infos = self.db_infos[aug_class][img_shape_key]
-                ins_ids = sample(range(len(class_db_infos)), min(16, self.max_objs - len(annos)))
-                for ins_id in ins_ids:
-                    ins = class_db_infos[ins_id]
-                    patch_img_path = os.path.join(self.kitti_root, "../" + ins["path"])
-                    if use_right:
-                        box2d = ins["bbox_r"]
-                        P = ins["P3"]
-                        patch_img_path = patch_img_path.replace("image_2", "image_3")
-                    else:
-                        box2d = ins["bbox_l"]
-                        P = ins["P2"]
-                    
-                    if ins['difficulty'] > 0:
-                        continue
-                    if len(init_bboxes.shape) > 1:
-                        ious = kitti.iou(init_bboxes, box2d[np.newaxis, ...])
-                        if np.max(ious) > 0.0:
+            for aug_class, aug_nums in self.class_aug_nums.items():
+                img_shape_key = f"{img.shape[0]}_{img.shape[1]}"
+                if img_shape_key in self.db_infos[aug_class].keys():
+                    class_db_infos = self.db_infos[aug_class][img_shape_key]
+                    trial_num = aug_nums + 30
+                    nums = 0
+                    for i in range(trial_num):
+                        if nums >= aug_nums:
+                            break
+                        sample_id = self.sample_counter[aug_class][img_shape_key]
+                        self.update_sample_counter(aug_class, img_shape_key) 
+                        ins = class_db_infos[sample_id]
+                        patch_img_path = os.path.join(self.kitti_root, "../" + ins["path"])
+                        if use_right:
+                            box2d = ins["bbox_r"]
+                            P = ins["P3"]
+                            patch_img_path = patch_img_path.replace("image_2", "image_3")
+                        else:
+                            box2d = ins["bbox_l"]
+                            P = ins["P2"]
+                        
+                        if ins['difficulty'] > 0:
                             continue
-                        init_bboxes = np.vstack((init_bboxes, box2d[np.newaxis, ...]))
-                    else:
-                        init_bboxes = box2d[np.newaxis, ...].copy()
-                    patch_img = cv2.imread(patch_img_path)
-                    img[int(box2d[1]):int(box2d[3]), int(box2d[0]):int(box2d[2]), :] = patch_img
-                    ins_anno = {
-                        "name": ins["name"],
-                        "label": class_to_label[ins["name"]],
-                        "bbox": box2d,
-                        "alpha": ins["alpha"],
-                        "dim": ins["dim"],
-                        "loc": ins["loc"],
-                        "roty": ins["roty"],
-                        "P": P,
-                        "difficulty": ins["difficulty"],
-                        "truncated": ins["truncated"],
-                        "occluded": ins["occluded"],
-                        "flipped": False,
-                        "score": ins["score"]
-                    }
-                    embedding_annos.append(ins_anno) 
+                        if len(init_bboxes.shape) > 1:
+                            ious = kitti.iou(init_bboxes, box2d[np.newaxis, ...])
+                            if np.max(ious) > 0.0:
+                                continue
+                            init_bboxes = np.vstack((init_bboxes, box2d[np.newaxis, ...]))
+                        else:
+                            init_bboxes = box2d[np.newaxis, ...].copy()
+                        patch_img = cv2.imread(patch_img_path)
+                        img[int(box2d[1]):int(box2d[3]), int(box2d[0]):int(box2d[2]), :] = patch_img
+                        ins_anno = {
+                            "name": ins["name"],
+                            "label": TYPE_ID_CONVERSION[ins["name"]],
+                            "bbox": box2d,
+                            "alpha": ins["alpha"],
+                            "dim": ins["dim"],
+                            "loc": ins["loc"],
+                            "roty": ins["roty"],
+                            "P": P,
+                            "difficulty": ins["difficulty"],
+                            "truncated": ins["truncated"],
+                            "occluded": ins["occluded"],
+                            "flipped": False,
+                            "score": ins["score"]
+                        }
+                        embedding_annos.append(ins_anno) 
+                        nums += 1
             aug_annos_num = len(embedding_annos)
             if ori_annos_num == aug_annos_num:
                 use_bcp = False

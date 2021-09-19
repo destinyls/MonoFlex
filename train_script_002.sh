@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=7 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --output output/DLA-34_BASELINE_TRAINVAL_001nd
+CUDA_VISIBLE_DEVICES=2,3 python tools/plain_train_net.py --batch_size 8 --backbone dla34 --gpu 2,3 --num_gpus 2 --output output/DLA-34_BCP_TRAIN_MULTI_CLASSES_PSEUDO_LABELS_1899_FROM_TRAIN_001nd
