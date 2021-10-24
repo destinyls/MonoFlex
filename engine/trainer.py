@@ -38,6 +38,25 @@ def reduce_loss_dict(loss_dict):
 
 	return reduced_losses
 
+@torch.no_grad()
+def update_teacher_model(model, model_teacher, keep_rate=0.996):
+    if get_world_size() > 1:
+        student_model_dict = {
+            key[7:]: value for key, value in model.state_dict().items()
+        }
+    else:
+        student_model_dict = model.state_dict()
+    new_teacher_dict = OrderedDict()
+    for key, value in model_teacher.state_dict().items():
+        if key in student_model_dict.keys():
+            new_teacher_dict[key] = (
+                student_model_dict[key] *
+                (1 - keep_rate) + value * keep_rate
+            )
+        else:
+            raise Exception("{} is not found in student model".format(key))
+    model_teacher.load_state_dict(new_teacher_dict)
+
 def do_eval(cfg, model, data_loaders_val, iteration, depth_method):
 	eval_types = ("detection",)
 	dataset_name = cfg.DATASETS.TEST[0]
@@ -69,6 +88,7 @@ def do_train(
 		cfg,
 		distributed,
 		model,
+		model_teacher,
 		data_loader,
 		data_loaders_val,
 		optimizer,
@@ -92,9 +112,9 @@ def do_train(
 	else:
 		warmup_iters = -1
 
-	print("***************: ", get_world_size())
-
 	model.train()
+	model_teacher.train()
+
 	start_training_time = time.time()
 	end = time.time()
 
@@ -179,7 +199,7 @@ def do_train(
 		if iteration == max_iter and comm.get_rank() == 0:
 			checkpointer.save("model_final", **arguments)
 
-		if iteration % cfg.SOLVER.EVAL_INTERVAL == 0:
+		if iteration % cfg.SOLVER.EVAL_INTERVAL == 0 and iteration > 25000:
 			for idx, depth_method in enumerate(eval_depth_methods):
 				
 				if cfg.SOLVER.EVAL_AND_SAVE_EPOCH:

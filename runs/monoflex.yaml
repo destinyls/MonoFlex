@@ -88,4 +88,4 @@ TEST:
   DETECTIONS_THRESHOLD: 0.2
   METRIC: ['R11']
 
-OUTPUT_DIR: "./output/toy_experiments" 
+OUTPUT_DIR: "./checkpoints/TRAIN_NOISE_NO_RIGHT_FLIP_001nd" 

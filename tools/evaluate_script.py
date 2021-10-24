@@ -15,7 +15,7 @@ args = parser.parse_args()
 if __name__ == '__main__':
     pred_label_folder = args.pred_label_folder
     gt_label_path = "/root/SMOKE/datasets/kitti/training/label_2"
-    metric_path = os.path.join(pred_label_folder, "../R11")
+    metric_path = os.path.join(pred_label_folder, "../Teacher_R11")
     if not os.path.exists(metric_path):
         os.makedirs(metric_path)
     

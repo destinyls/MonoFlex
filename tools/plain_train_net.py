@@ -31,7 +31,7 @@ torch.backends.cudnn.enabled = True # enable cudnn and uncertainty imported
 # torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True # enable cudnn to search the best algorithm
 
-def train(cfg, model, device, distributed):
+def train(cfg, model, model_teacher, device, distributed):
     data_loader = make_data_loader(cfg, is_train=True)
     data_loaders_val = build_test_loader(cfg, is_train=False)
 
@@ -71,6 +71,7 @@ def train(cfg, model, device, distributed):
         cfg,
         distributed,
         model,
+        model_teacher,
         data_loader,
         data_loaders_val,
         optimizer,
@@ -111,8 +112,11 @@ def setup(args):
 def main(args):
     cfg = setup(args)
     model = KeypointDetector(cfg)
+    model_teacher = KeypointDetector(cfg)
+
     device = torch.device(cfg.MODEL.DEVICE)
     model.to(device)
+    model_teacher.to(device)
 
     if args.eval_only:
         checkpointer = DetectronCheckpointer(
@@ -129,13 +133,14 @@ def main(args):
         # convert BN to SyncBN
         if cfg.MODEL.USE_SYNC_BN:
             model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+            model_teacher = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model_teacher)
 
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[comm.get_local_rank()], broadcast_buffers=False,
             find_unused_parameters=True,
         )
 
-    train(cfg, model, device, distributed)
+    train(cfg, model, model_teacher, device, distributed)
 
 if __name__ == '__main__':
     args = default_argument_parser().parse_args()

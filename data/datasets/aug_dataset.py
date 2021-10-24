@@ -29,19 +29,20 @@ class AUGDataset():
         self.max_objs = cfg.DATASETS.MAX_OBJECTS
         self.classes = cfg.DATASETS.DETECT_CLASSES
 
-        self.right_prob = 0.5
+        self.right_prob = 0.0
         self.bcp_prob = 0.5
 
         if self.split == "train":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_train.pkl")
-            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_31552_006nd.pkl")
+            # db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_31552_006nd.pkl")
+            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_uncertainty.pkl")
         elif self.split == "val":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_val.pkl")
         elif self.split == "trainval":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_trainval.pkl")
             db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_trainval.pkl")
         elif self.split == "test":
-            info_path = os.path.join(self.kitti_root, "../kitti_infos_test_7518.pkl")
+            info_path = os.path.join(self.kitti_root, "../kitti_infos_test_48666.pkl")
         else:
             raise ValueError("Invalid split!")
 
@@ -62,7 +63,7 @@ class AUGDataset():
                     self.sample_nums_hashmap[class_name][img_shape_key] = len(class_shape_db_infos)
                     self.sample_counter[class_name][img_shape_key] = 0
         
-        self.class_aug_nums = {"Car": 18, "Pedestrian": 9, "Cyclist": 9}
+        self.class_aug_nums = {"Car": 24, "Pedestrian": 12, "Cyclist": 12}
     
     def reset_sample_counter(self):
         for class_name, class_counter in self.sample_counter.items():
@@ -147,7 +148,7 @@ class AUGDataset():
                 img_shape_key = f"{img.shape[0]}_{img.shape[1]}"
                 if img_shape_key in self.db_infos[aug_class].keys():
                     class_db_infos = self.db_infos[aug_class][img_shape_key]
-                    trial_num = aug_nums + 30
+                    trial_num = aug_nums + 60
                     nums = 0
                     for i in range(trial_num):
                         if nums >= aug_nums:
@@ -155,7 +156,7 @@ class AUGDataset():
                         sample_id = self.sample_counter[aug_class][img_shape_key]
                         self.update_sample_counter(aug_class, img_shape_key) 
                         ins = class_db_infos[sample_id]
-                        patch_img_path = os.path.join(self.kitti_root, "../" + ins["path"])
+                        patch_img_path = os.path.join(self.kitti_root, "../", ins["filepath_l"])
                         if use_right:
                             box2d = ins["bbox_r"]
                             P = ins["P3"]
@@ -166,6 +167,8 @@ class AUGDataset():
                         
                         if ins['difficulty'] > 0:
                             continue
+                        if ins['score'] < 0.7 or ins['geo_conf'] < 0.75:
+                            continue
                         if len(init_bboxes.shape) > 1:
                             ious = kitti.iou(init_bboxes, box2d[np.newaxis, ...])
                             if np.max(ious) > 0.0:
@@ -173,8 +176,39 @@ class AUGDataset():
                             init_bboxes = np.vstack((init_bboxes, box2d[np.newaxis, ...]))
                         else:
                             init_bboxes = box2d[np.newaxis, ...].copy()
+                        
                         patch_img = cv2.imread(patch_img_path)
-                        img[int(box2d[1]):int(box2d[3]), int(box2d[0]):int(box2d[2]), :] = patch_img
+                        box2d_h = int(box2d[3]) - int(box2d[1])
+                        box2d_w = int(box2d[2]) - int(box2d[0])
+                        img_ind_0, img_ind_1 = int(box2d[0]), int(box2d[1])
+                        patch_img_ind_0, patch_img_ind_1 = 0, 0
+                        if ins["name"] == "Car":
+                            box2d_w_delta = int(0.2 * random.random() * box2d_w)
+                            box2d_h_delta = int(0.2 * random.random() * box2d_h)
+                            box2d_w = box2d_w - box2d_w_delta
+                            box2d_h = box2d_h - box2d_h_delta
+                            if random.random() < 0.5:
+                                img_ind_1 = int(box2d[1]) + box2d_h_delta
+                                patch_img_ind_1 = box2d_h_delta
+                            if random.random() < 0.5:
+                                img_ind_0 = int(box2d[0]) + box2d_w_delta
+                                patch_img_ind_0 = box2d_w_delta
+                        
+                        if random.random() < 0.5:
+                            if patch_img_ind_0 > 0:
+                                img[int(box2d[1]):int(box2d[3]):, int(box2d[0]): img_ind_0, :] = [random.randint(64, 191) for _ in range(3)]
+                            else:
+                                img[int(box2d[1]):int(box2d[3]), img_ind_0 + box2d_w :int(box2d[2]), :] = [random.randint(64, 191) for _ in range(3)]
+                            if patch_img_ind_1 > 0:
+                                img[int(box2d[1]): img_ind_1, int(box2d[0]):int(box2d[2]), :] = [random.randint(64, 191) for _ in range(3)]
+                            else:
+                                img[img_ind_1 + box2d_h:int(box2d[3]), int(box2d[0]):int(box2d[2]), :] = [random.randint(64, 191) for _ in range(3)]
+
+                        ratio = random.randint(6, 10) / 10
+                        img[img_ind_1 : img_ind_1 + box2d_h, img_ind_0 : img_ind_0 + box2d_w, :] =\
+                            img[img_ind_1 : img_ind_1 + box2d_h, img_ind_0 : img_ind_0 + box2d_w, :] * (1 - ratio) +\
+                            patch_img[patch_img_ind_1 : patch_img_ind_1 + box2d_h, patch_img_ind_0 : patch_img_ind_0 + box2d_w, :] * ratio
+
                         ins_anno = {
                             "name": ins["name"],
                             "label": TYPE_ID_CONVERSION[ins["name"]],
