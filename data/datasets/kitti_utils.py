@@ -115,6 +115,7 @@ class Object3d(object):
         self.h = anno_ins["dim"][1]  # box height   
         self.w = anno_ins["dim"][2]  # box width
         self.l = anno_ins["dim"][0]  # box length (in meters)
+        self.dim = anno_ins["dim"]
         self.t = anno_ins["loc"]     # location (x,y,z) in camera coord.
 
         self.dis_to_cam = np.linalg.norm(self.t)
@@ -1085,7 +1086,7 @@ def approx_proj_center(proj_center, surface_centers, img_size):
         
         return valid_intersects[min_idx], valid_edge[min_idx]
     else:
-        return None
+        return None, None
 
 def get_3d_dis(image, objs, calib):
     image = np.array(image)

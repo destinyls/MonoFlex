@@ -1,5 +1,5 @@
 import os
-import csv
+import cv2
 import logging
 import random
 import pdb
@@ -21,6 +21,7 @@ from model.heatmap_coder import (
 
 from structures.params_3d import ParamsList
 from data.augmentations import get_composed_augmentations
+from data.datasets import kitti_common as kitti
 from .kitti_utils import Calibration, read_label, approx_proj_center, refresh_attributes, show_heatmap, show_image_with_boxes, show_edge_heatmap
 
 from config import TYPE_ID_CONVERSION
@@ -238,6 +239,16 @@ class KITTIDataset(Dataset):
         pts_2d[:, 0] /= pts_2d[:, 2]
         pts_2d[:, 1] /= pts_2d[:, 2]
         return pts_2d[:, 0:2], pts_2d[:, 2]
+    
+    def visualization(self, img, objs):
+        for obj in objs:
+            dim = obj.dim
+            loc = obj.t
+            roty = obj.ry
+            P2 = obj.P
+            box3d = kitti.compute_box_3d_image(P2, roty, dim, loc)
+            img = kitti.draw_box_3d(img, box3d)
+        return img
 
     def __getitem__(self, idx):
         use_right = False
@@ -253,7 +264,7 @@ class KITTIDataset(Dataset):
         # random horizontal flip
         if self.augmentation is not None:
             img, objs = self.augmentation(img, objs, use_right, use_bcp)
-
+        
         # pad image
         img_before_aug_pad = np.array(img).copy()
         img_w, img_h = img.size
@@ -289,6 +300,11 @@ class KITTIDataset(Dataset):
 
             return img, target, original_idx
 
+        '''
+        demo_img = cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+        demo_img = self.visualization(demo_img, objs)
+        cv2.imwrite(os.path.join("debug", original_idx + ".jpg"), demo_img)
+        '''
         # heatmap
         heat_map = np.zeros([self.num_classes, self.output_height, self.output_width], dtype=np.float32)
         ellip_heat_map = np.zeros([self.num_classes, self.output_height, self.output_width], dtype=np.float32)
@@ -383,6 +399,8 @@ class KITTIDataset(Dataset):
                     center_2d = (box2d[:2] + box2d[2:]) / 2
                     if self.proj_center_mode == 'intersect':
                         target_proj_center, edge_index = approx_proj_center(proj_center, center_2d.reshape(1, 2), (img_w, img_h))
+                        if target_proj_center is None:
+                            continue
                     else:
                         raise NotImplementedError
                 else:

@@ -33,7 +33,7 @@ class AUGDataset():
         self.bcp_prob = 0.5
 
         if self.split == "train":
-            info_path = os.path.join(self.kitti_root, "../kitti_infos_train.pkl")
+            info_path = os.path.join(self.kitti_root, "../kitti_infos_train_enhanced.pkl")
             # db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_31552_006nd.pkl")
             db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_uncertainty.pkl")
         elif self.split == "val":
@@ -48,6 +48,7 @@ class AUGDataset():
 
         with open(info_path, 'rb') as f:
             self.kitti_infos = pickle.load(f)
+        random.shuffle(self.kitti_infos)
         self.num_samples = len(self.kitti_infos)
 
         if self.is_train:
@@ -93,9 +94,6 @@ class AUGDataset():
         image_idx = info["image_idx"]
         P2 = info["calib/P2"]
         P3 = info["calib/P3"]
-        img_size = [img.shape[1], img.shape[0]]
-        center = np.array([i / 2 for i in img_size], dtype=np.float32)
-        size = np.array([i for i in img_size], dtype=np.float32)
 
         if not self.is_train:
             img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
