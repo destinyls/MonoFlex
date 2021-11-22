@@ -28,6 +28,9 @@ class AUGDataset():
         self.is_train = is_train
         self.max_objs = cfg.DATASETS.MAX_OBJECTS
         self.classes = cfg.DATASETS.DETECT_CLASSES
+        self.use_border_cut = cfg.DATASETS.USE_BORDER_CUT
+        self.use_color_padding = cfg.DATASETS.USE_COLOR_PADDING
+        self.use_mixup = cfg.DATASETS.USE_MIXUP
 
         self.right_prob = 0.0
         self.bcp_prob = 0.5
@@ -35,7 +38,7 @@ class AUGDataset():
         if self.split == "train":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_train_enhanced.pkl")
             # db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_31552_006nd.pkl")
-            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_uncertainty.pkl")
+            db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_uncertainty_stage_002.pkl")
         elif self.split == "val":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_val.pkl")
         elif self.split == "trainval":
@@ -65,7 +68,8 @@ class AUGDataset():
                     self.sample_counter[class_name][img_shape_key] = 0
         
         self.class_aug_nums = {"Car": 24, "Pedestrian": 12, "Cyclist": 12}
-    
+        self.frame_cache = None
+
     def reset_sample_counter(self):
         for class_name, class_counter in self.sample_counter.items():
             for img_shape_key, class_shape_counter in class_counter.items():
@@ -137,7 +141,7 @@ class AUGDataset():
         init_bboxes = np.array(init_bboxes)
 
         use_bcp = False
-        if use_right or random.random() < self.bcp_prob:
+        if use_right or random.random() < self.bcp_prob or image_idx > 7480:
             use_bcp = True
 
         if use_bcp:
@@ -180,7 +184,7 @@ class AUGDataset():
                         box2d_w = int(box2d[2]) - int(box2d[0])
                         img_ind_0, img_ind_1 = int(box2d[0]), int(box2d[1])
                         patch_img_ind_0, patch_img_ind_1 = 0, 0
-                        if ins["name"] == "Car":
+                        if ins["name"] == "Car" and self.use_border_cut:
                             box2d_w_delta = int(0.2 * random.random() * box2d_w)
                             box2d_h_delta = int(0.2 * random.random() * box2d_h)
                             box2d_w = box2d_w - box2d_w_delta
@@ -192,7 +196,7 @@ class AUGDataset():
                                 img_ind_0 = int(box2d[0]) + box2d_w_delta
                                 patch_img_ind_0 = box2d_w_delta
                         
-                        if random.random() < 0.5:
+                        if random.random() < 0.5 and self.use_color_padding:
                             if patch_img_ind_0 > 0:
                                 img[int(box2d[1]):int(box2d[3]):, int(box2d[0]): img_ind_0, :] = [random.randint(64, 191) for _ in range(3)]
                             else:
@@ -202,7 +206,7 @@ class AUGDataset():
                             else:
                                 img[img_ind_1 + box2d_h:int(box2d[3]), int(box2d[0]):int(box2d[2]), :] = [random.randint(64, 191) for _ in range(3)]
 
-                        ratio = random.randint(6, 10) / 10
+                        ratio = random.randint(6, 10) / 10 if self.use_mixup else 1.0
                         img[img_ind_1 : img_ind_1 + box2d_h, img_ind_0 : img_ind_0 + box2d_w, :] =\
                             img[img_ind_1 : img_ind_1 + box2d_h, img_ind_0 : img_ind_0 + box2d_w, :] * (1 - ratio) +\
                             patch_img[patch_img_ind_1 : patch_img_ind_1 + box2d_h, patch_img_ind_0 : patch_img_ind_0 + box2d_w, :] * ratio
@@ -229,6 +233,11 @@ class AUGDataset():
                 use_bcp = False
 
         img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        if (self.frame_cache is None or random.random() < 0.05) and len(embedding_annos) > 3:
+            self.frame_cache = {"img": img, "P": P, "use_right": use_right,"embedding_annos": embedding_annos, "image_idx": image_idx}
+        if len(embedding_annos) == 0:
+            img, P, use_bcp, embedding_annos, image_idx, use_right = self.frame_cache["img"], self.frame_cache["P"], self.frame_cache["use_bcp"], \
+                self.frame_cache["embedding_annos"], self.frame_cache["image_idx"], self.frame_cache["use_right"]
         return img, P, use_right, use_bcp, embedding_annos, image_idx
 
     def visualization(self, img, annos, save_path):

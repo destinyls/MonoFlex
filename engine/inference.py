@@ -138,7 +138,7 @@ def inference(
         eval_types=("detections",),
         device="cuda",
         output_folder=None,
-        metrics=['R11'],
+        metrics=['R40'],
         vis=False,
         eval_score_iou=False,
 ):
@@ -194,7 +194,7 @@ def inference(
 
         iteration = int(predict_folder.split('/')[-2].split('_')[1])
         mAP_3d_moderate = ret_dict['Car_3d_0.70/moderate']
-        result_path = os.path.join(predict_folder, '../../../R11')
+        result_path = os.path.join(predict_folder, '../../../', metric)
         if not os.path.exists(result_path):
             os.makedirs(result_path)
         with open(os.path.join(result_path, 'epoch_result_{:07d}_{}.txt'.format(iteration, round(mAP_3d_moderate, 4))), "w") as f:
