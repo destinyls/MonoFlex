@@ -193,9 +193,10 @@ def do_train(
 
 		if iteration % cfg.SOLVER.SAVE_CHECKPOINT_INTERVAL == 0:
 			logger.info('iteration = {}, saving checkpoint ...'.format(iteration))
+			'''
 			if comm.get_rank() == 0:
 				checkpointer.save("model_checkpoint_{}".format(iteration), **arguments)
-			
+			'''
 		if iteration == max_iter and comm.get_rank() == 0:
 			checkpointer.save("model_final", **arguments)
 

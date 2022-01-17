@@ -32,12 +32,15 @@ class AUGDataset():
         self.use_color_padding = cfg.DATASETS.USE_COLOR_PADDING
         self.use_mixup = cfg.DATASETS.USE_MIXUP
 
+        self.cls_threshold = cfg.DATASETS.CLS_THRESHOLD
+        self.geo_conf_threshold = cfg.DATASETS.GEO_CONF_THRESHOLD
+
         self.right_prob = 0.0
         self.bcp_prob = 0.5
 
         if self.split == "train":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_train_enhanced.pkl")
-            # db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_31552_006nd.pkl")
+            background_info_path = os.path.join(self.kitti_root, "../kitti_infos_backgrounds_6568.pkl")
             db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_uncertainty_stage_002.pkl")
         elif self.split == "val":
             info_path = os.path.join(self.kitti_root, "../kitti_infos_val.pkl")
@@ -55,6 +58,9 @@ class AUGDataset():
         self.num_samples = len(self.kitti_infos)
 
         if self.is_train:
+            with open(background_info_path, 'rb') as f:
+                self.kitti_background_infos = pickle.load(f)
+                # self.kitti_background_infos = random.sample(kitti_background_infos, 2500)
             with open(db_info_path, 'rb') as f:
                 self.db_infos = pickle.load(f)
 
@@ -88,6 +94,11 @@ class AUGDataset():
 
     def __getitem__(self, idx):
         info = self.kitti_infos[idx]
+        '''
+        if info["image_idx"] > 7480:
+            info = random.choice(self.kitti_background_infos)
+        '''
+        image_idx = info["image_idx"]
         img_path = os.path.join(self.kitti_root, "../" + info["img_path"])
 
         use_right = False
@@ -95,10 +106,9 @@ class AUGDataset():
             use_right = True
             img_path = img_path.replace("image_2", "image_3")
         img = cv2.imread(img_path)
-        image_idx = info["image_idx"]
+        
         P2 = info["calib/P2"]
         P3 = info["calib/P3"]
-
         if not self.is_train:
             img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             return img, P2, image_idx
@@ -135,7 +145,8 @@ class AUGDataset():
                     "truncated": truncated[i],
                     "occluded": occluded[i],
                     "flipped": False,
-                    "score": scores[i]
+                    "score": scores[i],
+                    "gt_label": True
                 }
             embedding_annos.append(ins_anno)
         init_bboxes = np.array(init_bboxes)
@@ -169,7 +180,7 @@ class AUGDataset():
                         
                         if ins['difficulty'] > 0:
                             continue
-                        if ins['score'] < 0.7 or ins['geo_conf'] < 0.75:
+                        if ins['score'] < self.cls_threshold or ins['geo_conf'] < self.geo_conf_threshold:
                             continue
                         if len(init_bboxes.shape) > 1:
                             ious = kitti.iou(init_bboxes, box2d[np.newaxis, ...])
@@ -224,9 +235,10 @@ class AUGDataset():
                             "truncated": ins["truncated"],
                             "occluded": ins["occluded"],
                             "flipped": False,
-                            "score": ins["score"]
+                            "score": ins["score"],
+                            "gt_label": False
                         }
-                        embedding_annos.append(ins_anno) 
+                        embedding_annos.append(ins_anno)
                         nums += 1
             aug_annos_num = len(embedding_annos)
             if ori_annos_num == aug_annos_num:
@@ -234,8 +246,8 @@ class AUGDataset():
 
         img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         if (self.frame_cache is None or random.random() < 0.05) and len(embedding_annos) > 3:
-            self.frame_cache = {"img": img, "P": P, "use_right": use_right,"embedding_annos": embedding_annos, "image_idx": image_idx}
-        if len(embedding_annos) == 0:
+            self.frame_cache = {"img": img, "P": P, "use_right": use_right,"embedding_annos": embedding_annos, "image_idx": image_idx, "use_bcp": use_bcp}
+        if len(embedding_annos) == 0 and self.frame_cache is not None:
             img, P, use_bcp, embedding_annos, image_idx, use_right = self.frame_cache["img"], self.frame_cache["P"], self.frame_cache["use_bcp"], \
                 self.frame_cache["embedding_annos"], self.frame_cache["image_idx"], self.frame_cache["use_right"]
         return img, P, use_right, use_bcp, embedding_annos, image_idx
