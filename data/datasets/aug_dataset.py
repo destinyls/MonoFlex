@@ -36,10 +36,10 @@ class AUGDataset():
         self.geo_conf_threshold = cfg.DATASETS.GEO_CONF_THRESHOLD
 
         self.right_prob = 0.0
-        self.bcp_prob = 0.5
+        self.bcp_prob = 0.0
 
         if self.split == "train":
-            info_path = os.path.join(self.kitti_root, "../kitti_infos_train_enhanced.pkl")
+            info_path = os.path.join(self.kitti_root, "../kitti_infos_train.pkl")
             background_info_path = os.path.join(self.kitti_root, "../kitti_infos_backgrounds_6568.pkl")
             db_info_path = os.path.join(self.kitti_root, "../kitti_dbinfos_test_uncertainty_stage_002.pkl")
         elif self.split == "val":
@@ -53,7 +53,11 @@ class AUGDataset():
             raise ValueError("Invalid split!")
 
         with open(info_path, 'rb') as f:
-            self.kitti_infos = pickle.load(f)
+            kitti_infos = pickle.load(f)
+            if self.split in ["train"]: 
+                self.kitti_infos = kitti_infos[:int(0.1 * len(kitti_infos))]
+            else:
+                self.kitti_infos = kitti_infos
         random.shuffle(self.kitti_infos)
         self.num_samples = len(self.kitti_infos)
 
@@ -154,7 +158,6 @@ class AUGDataset():
         use_bcp = False
         if use_right or random.random() < self.bcp_prob or image_idx > 7480:
             use_bcp = True
-
         if use_bcp:
             ori_annos_num = len(embedding_annos)
             for aug_class, aug_nums in self.class_aug_nums.items():

@@ -126,6 +126,8 @@ class Object3d(object):
         self.alpha = convertRot2Alpha(self.ry, self.t[2], self.t[0])
         self.P = anno_ins["P"]
 
+        self.gt_label = anno_ins["gt_label"]
+
         # difficulty level 
         self.level_str = None
         self.level = self.get_kitti_obj_level()

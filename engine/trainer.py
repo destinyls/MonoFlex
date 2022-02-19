@@ -200,7 +200,7 @@ def do_train(
 		if iteration == max_iter and comm.get_rank() == 0:
 			checkpointer.save("model_final", **arguments)
 
-		if iteration % cfg.SOLVER.EVAL_INTERVAL == 0 and iteration > 25000:
+		if iteration % cfg.SOLVER.EVAL_INTERVAL == 0:
 			for idx, depth_method in enumerate(eval_depth_methods):
 				
 				if cfg.SOLVER.EVAL_AND_SAVE_EPOCH:
